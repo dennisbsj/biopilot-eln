@@ -9,7 +9,7 @@ type Doc={
   id:string; elnNumber:string; sequence:number; year:number; title:string;
   experimentNumber:string; contentHtml:string; createdAt:string; updatedAt:string;
 };
-type Screen="home"|"open"|"delete"|"editor";
+type Screen="home"|"browse"|"editor";
 
 const DOCS_KEY="biopilot-eln-docs-v1";
 const SEQ_KEY="biopilot-eln-seq-v1";
@@ -58,12 +58,11 @@ function Home({go}:{go:(s:Screen)=>void}){
     <p className="lead">Create, open and manage laboratory notes. Documents can be linked to a BioPilot experiment by experiment number.</p>
     <section className="cards">
       <button className="card primary" type="button" onClick={()=>{go("editor")}}><span><FilePlus2/></span><div><b>New</b><small>Create a new ELN document</small></div><ChevronRight/></button>
-      <button className="card" type="button" onClick={()=>go("open")}><span><FolderOpen/></span><div><b>Open</b><small>Find and continue an existing document</small></div><ChevronRight/></button>
-      <button className="card danger" type="button" onClick={()=>go("delete")}><span><Trash2/></span><div><b>Delete</b><small>Remove an ELN document</small></div><ChevronRight/></button>
+      <button className="card" type="button" onClick={()=>go("browse")}><span><FolderOpen/></span><div><b>Browse</b><small>Open or delete existing ELN documents</small></div><ChevronRight/></button>
     </section>
   </main>;
 }
-function Browser({mode,docs,back,open,remove}:{mode:"open"|"delete";docs:Doc[];back:()=>void;open:(d:Doc)=>void;remove:(d:Doc)=>void}){
+function Browser({docs,back,open,remove}:{docs:Doc[];back:()=>void;open:(d:Doc)=>void;remove:(d:Doc)=>void}){
   const[q,setQ]=useState("");
   const filtered=useMemo(()=>{
     const s=q.trim().toLowerCase(); if(!s)return docs;
@@ -72,16 +71,16 @@ function Browser({mode,docs,back,open,remove}:{mode:"open"|"delete";docs:Doc[];b
   return <main className="browser">
     <div className="heading">
       <button className="back" type="button" onClick={back}><ArrowLeft size={18}/> Back</button>
-      <div><h2>{mode==="open"?"Open ELN":"Delete ELN"}</h2><p>{mode==="open"?"Select a document to continue editing.":"Select a document to permanently remove it."}</p></div>
+      <div><h2>Browse ELN</h2><p>Open an ELN document or delete it from the list.</p></div>
       <span className="count">{docs.length} {docs.length===1?"document":"documents"}</span>
     </div>
     <label className="search"><Search size={18}/><input autoFocus value={q} onChange={e=>setQ(e.target.value)} placeholder="Search by ELN number, title or experiment number"/>{q&&<button type="button" onClick={()=>setQ("")}><X size={15}/></button>}</label>
-    {filtered.length===0?<div className="empty">{mode==="open"?<FolderOpen/>:<Trash2/>}<b>{q?"No matching ELN documents":"No ELN documents found"}</b><small>{q?"Try another search.":mode==="open"?"Create a new document to get started.":"There are no documents available to delete."}</small></div>:
+    {filtered.length===0?<div className="empty"><FolderOpen/><b>{q?"No matching ELN documents":"No ELN documents found"}</b><small>{q?"Try another search.":"Create a new document to get started."}</small></div>:
     <div className="tableWrap"><table><thead><tr><th>ELN number</th><th>Title</th><th>Experiment</th><th>Last edited</th><th/></tr></thead><tbody>
-      {filtered.map(d=><tr key={d.id} onDoubleClick={()=>mode==="open"&&open(d)}>
-        <td className="num"><ScrollText size={16}/>{d.elnNumber}</td><td>{d.title||d.elnNumber}</td>
+      {filtered.map(d=><tr className="browseRow" key={d.id} onClick={()=>open(d)} tabIndex={0} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();open(d)}}}>
+        <td className="num"><ScrollText size={16}/><span>{d.elnNumber}</span></td><td>{d.title||d.elnNumber}</td>
         <td>{d.experimentNumber?<span className="chip"><Microscope size={14}/>{d.experimentNumber}</span>:<i>—</i>}</td><td>{fmt(d.updatedAt)}</td>
-        <td className="action">{mode==="open"?<button type="button" onClick={()=>open(d)}>Open <ChevronRight size={16}/></button>:<button type="button" className="delete" onClick={()=>remove(d)}><Trash2 size={15}/> Delete</button>}</td>
+        <td className="action"><button type="button" className="delete" onClick={e=>{e.stopPropagation();remove(d)}}><Trash2 size={15}/> Delete</button></td>
       </tr>)}
     </tbody></table></div>}
   </main>;
