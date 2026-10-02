@@ -15,7 +15,21 @@ const DOCS_KEY="biopilot-eln-docs-v1";
 const SEQ_KEY="biopilot-eln-seq-v1";
 
 function loadDocs():Doc[]{
-  try{return JSON.parse(localStorage.getItem(DOCS_KEY)||"[]")}catch{return[]}
+  try{
+    const parsed=JSON.parse(localStorage.getItem(DOCS_KEY)||"[]");
+    if(!Array.isArray(parsed))return[];
+    return parsed.map((d:any)=>({
+      id:String(d.id||crypto.randomUUID()),
+      elnNumber:String(d.elnNumber||""),
+      sequence:Number(d.sequence||0),
+      year:Number(d.year||new Date().getFullYear()),
+      title:String(d.title||d.elnNumber||""),
+      experimentNumber:String(d.experimentNumber||""),
+      contentHtml:String(d.contentHtml||""),
+      createdAt:String(d.createdAt||new Date().toISOString()),
+      updatedAt:String(d.updatedAt||d.createdAt||new Date().toISOString())
+    })).filter((d:Doc)=>d.elnNumber);
+  }catch{return[]}
 }
 function persist(docs:Doc[]){localStorage.setItem(DOCS_KEY,JSON.stringify(docs))}
 function nextNumber(){
@@ -57,8 +71,8 @@ function Home({go}:{go:(s:Screen)=>void}){
     <h1>ELN</h1>
     <p className="lead">Create, open and manage laboratory notes. Documents can be linked to a BioPilot experiment by experiment number.</p>
     <section className="cards">
-      <button className="card primary" type="button" onClick={()=>{go("editor")}}><span><FilePlus2/></span><div><b>New</b><small>Create a new ELN document</small></div><ChevronRight/></button>
-      <button className="card" type="button" onClick={()=>go("browse")}><span><FolderOpen/></span><div><b>Browse</b><small>Open or delete existing ELN documents</small></div><ChevronRight/></button>
+      <button className="card primary" type="button" onClick={()=>go("editor")}><span><FilePlus2/></span><div><b>New</b><small>Create a new ELN document</small></div><ChevronRight/></button>
+      <button className="card" type="button" onClick={()=>go("browse")} aria-label="Browse ELN documents"><span><FolderOpen/></span><div><b>Browse</b><small>Open or delete existing ELN documents</small></div><ChevronRight/></button>
     </section>
   </main>;
 }
@@ -180,8 +194,17 @@ export default function App(){
     setDocs(list=>list.some(x=>x.id===d.id)?list.map(x=>x.id===d.id?d:x):[d,...list]);
   };
   const go=(s:Screen)=>{
-    if(s==="editor"){setCurrent(makeDoc());setScreen("editor");return}
-    setScreen(s);
+    if(s==="editor"){
+      setCurrent(makeDoc());
+      setScreen("editor");
+      return;
+    }
+    if(s==="browse"){
+      setCurrent(null);
+      setScreen("browse");
+      return;
+    }
+    setScreen("home");
   };
   const home=()=>setScreen("home");
   const remove=()=>{if(!pendingDelete)return;setDocs(list=>list.filter(d=>d.id!==pendingDelete.id));setPendingDelete(null)};
