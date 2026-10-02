@@ -92,7 +92,7 @@ function Browser({docs,back,open,remove}:{docs:Doc[];back:()=>void;open:(d:Doc)=
     {filtered.length===0?<div className="empty"><FolderOpen/><b>{q?"No matching ELN documents":"No ELN documents found"}</b><small>{q?"Try another search.":"Create a new document to get started."}</small></div>:
     <div className="tableWrap"><table><thead><tr><th>ELN number</th><th>Title</th><th>Experiment</th><th>Last edited</th><th/></tr></thead><tbody>
       {filtered.map(d=><tr className="browseRow" key={d.id} onClick={()=>open(d)} tabIndex={0} onKeyDown={e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();open(d)}}}>
-        <td className="num"><ScrollText size={16}/><span>{d.elnNumber}</span></td><td>{d.title||d.elnNumber}</td>
+        <td className="num"><span className="numInner"><ScrollText size={16}/><span>{d.elnNumber}</span></span></td><td>{d.title||d.elnNumber}</td>
         <td>{d.experimentNumber?<span className="chip"><Microscope size={14}/>{d.experimentNumber}</span>:<i>—</i>}</td><td>{fmt(d.updatedAt)}</td>
         <td className="action"><button type="button" className="delete" onClick={e=>{e.stopPropagation();remove(d)}}><Trash2 size={15}/> Delete</button></td>
       </tr>)}
