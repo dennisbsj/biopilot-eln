@@ -31,7 +31,7 @@ function commitNumber(year:number,sequence:number){
 }
 function makeDoc():Doc{
   const n=nextNumber(),now=new Date().toISOString();
-  return {id:crypto.randomUUID(),...n,title:"",experimentNumber:"",contentHtml:"",createdAt:now,updatedAt:now};
+  return {id:crypto.randomUUID(),...n,title:n.elnNumber,experimentNumber:"",contentHtml:"",createdAt:now,updatedAt:now};
 }
 function fmt(v:string){
   return new Intl.DateTimeFormat("en-GB",{day:"2-digit",month:"short",year:"numeric",hour:"2-digit",minute:"2-digit"}).format(new Date(v));
@@ -79,7 +79,7 @@ function Browser({mode,docs,back,open,remove}:{mode:"open"|"delete";docs:Doc[];b
     {filtered.length===0?<div className="empty">{mode==="open"?<FolderOpen/>:<Trash2/>}<b>{q?"No matching ELN documents":"No ELN documents found"}</b><small>{q?"Try another search.":mode==="open"?"Create a new document to get started.":"There are no documents available to delete."}</small></div>:
     <div className="tableWrap"><table><thead><tr><th>ELN number</th><th>Title</th><th>Experiment</th><th>Last edited</th><th/></tr></thead><tbody>
       {filtered.map(d=><tr key={d.id} onDoubleClick={()=>mode==="open"&&open(d)}>
-        <td className="num"><ScrollText size={16}/>{d.elnNumber}</td><td>{d.title||<i>Untitled document</i>}</td>
+        <td className="num"><ScrollText size={16}/>{d.elnNumber}</td><td>{d.title||d.elnNumber}</td>
         <td>{d.experimentNumber?<span className="chip"><Microscope size={14}/>{d.experimentNumber}</span>:<i>—</i>}</td><td>{fmt(d.updatedAt)}</td>
         <td className="action">{mode==="open"?<button type="button" onClick={()=>open(d)}>Open <ChevronRight size={16}/></button>:<button type="button" className="delete" onClick={()=>remove(d)}><Trash2 size={15}/> Delete</button>}</td>
       </tr>)}
@@ -116,8 +116,11 @@ function Editor({doc,onChange,onSave,onBack}:{doc:Doc;onChange:(d:Doc)=>void;onS
   const editor=useRef<HTMLDivElement>(null);
   const[dirty,setDirty]=useState(false);
   const[savedAt,setSavedAt]=useState(doc.updatedAt);
+  const[editingTitle,setEditingTitle]=useState(false);
+  const titleInput=useRef<HTMLInputElement>(null);
 
   useEffect(()=>{if(editor.current&&editor.current.innerHTML!==doc.contentHtml)editor.current.innerHTML=doc.contentHtml},[doc.id]);
+  useEffect(()=>{if(editingTitle){titleInput.current?.focus();titleInput.current?.select()}},[editingTitle]);
   const update=(patch:Partial<Doc>)=>{onChange({...doc,...patch});setDirty(true)};
   const save=()=>{
     const d={...doc,contentHtml:editor.current?.innerHTML||doc.contentHtml,updatedAt:new Date().toISOString()};
@@ -141,11 +144,26 @@ function Editor({doc,onChange,onSave,onBack}:{doc:Doc;onChange:(d:Doc)=>void;onS
       <button className="save" type="button" onClick={save}><Save size={16}/> Save</button>
     </div>
     <section className="meta">
-      <label><span>Document title</span><input value={doc.title} onChange={e=>update({title:e.target.value})} placeholder="Untitled document"/></label>
       <label><span>Experiment no.</span><div className="iconInput"><Microscope size={16}/><input value={doc.experimentNumber} onChange={e=>update({experimentNumber:e.target.value})} placeholder="e.g. EXP-00124"/></div></label>
       <div><span>Created</span><b>{fmt(doc.createdAt)}</b></div>
     </section>
-    <section className="paperWrap"><div className="paper"><Toolbar/><div ref={editor} className="rich" contentEditable suppressContentEditableWarning data-placeholder="Start writing your laboratory notes…" onInput={e=>update({contentHtml:e.currentTarget.innerHTML})} onPaste={e=>{e.preventDefault();document.execCommand("insertText",false,e.clipboardData.getData("text/plain"))}}/></div></section>
+    <section className="paperWrap"><div className="paper">
+      <div className="documentTitleBar">
+        {editingTitle?
+          <input
+            ref={titleInput}
+            className="documentTitleInput"
+            value={doc.title}
+            onChange={e=>update({title:e.target.value})}
+            onBlur={()=>{if(!doc.title.trim())update({title:doc.elnNumber});setEditingTitle(false)}}
+            onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();e.currentTarget.blur()}if(e.key==="Escape"){e.preventDefault();setEditingTitle(false)}}}
+          />:
+          <button className="documentTitle" type="button" onClick={()=>setEditingTitle(true)} title="Click to edit document title">{doc.title||doc.elnNumber}</button>
+        }
+      </div>
+      <Toolbar/>
+      <div ref={editor} className="rich" contentEditable suppressContentEditableWarning data-placeholder="Start writing your laboratory notes…" onInput={e=>update({contentHtml:e.currentTarget.innerHTML})} onPaste={e=>{e.preventDefault();document.execCommand("insertText",false,e.clipboardData.getData("text/plain"))}}/>
+    </div></section>
   </main>;
 }
 function Confirm({doc,cancel,confirm}:{doc:Doc;cancel:()=>void;confirm:()=>void}){
