@@ -157,6 +157,7 @@ function Editor({doc,onChange,onSave,onBack}:{doc:Doc;onChange:(d:Doc)=>void;onS
       <button className="save" type="button" onClick={save}><Save size={16}/> Save</button>
     </div>
     <section className="meta">
+      <label><span>Document name</span><input value={doc.title} onChange={e=>update({title:e.target.value})} onBlur={()=>{if(!doc.title.trim())update({title:doc.elnNumber})}} placeholder={doc.elnNumber}/></label>
       <label><span>Experiment no.</span><div className="iconInput"><Microscope size={16}/><input value={doc.experimentNumber} onChange={e=>update({experimentNumber:e.target.value})} placeholder="e.g. EXP-00124"/></div></label>
       <div><span>Created</span><b>{fmt(doc.createdAt)}</b></div>
     </section>
