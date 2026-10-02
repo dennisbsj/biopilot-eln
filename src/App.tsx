@@ -188,8 +188,7 @@ export default function App(){
 
   return <div className="app"><Header home={home}/>
     {screen==="home"&&<Home go={go}/>}
-    {screen==="open"&&<Browser mode="open" docs={docs} back={home} open={d=>{setCurrent(d);setScreen("editor")}} remove={()=>{}}/>}
-    {screen==="delete"&&<Browser mode="delete" docs={docs} back={home} open={()=>{}} remove={setPendingDelete}/>}
+    {screen==="browse"&&<Browser docs={docs} back={home} open={d=>{setCurrent(d);setScreen("editor")}} remove={setPendingDelete}/>}
     {screen==="editor"&&current&&<Editor doc={current} onChange={setCurrent} onSave={save} onBack={home}/>}
     {pendingDelete&&<Confirm doc={pendingDelete} cancel={()=>setPendingDelete(null)} confirm={remove}/>}
   </div>;
