@@ -137,11 +137,16 @@ export async function listBrowser():Promise<Doc[]>{
 export async function createBrowser():Promise<Doc>{
   await ensureMigrated();
   const year=new Date().getFullYear();
-  const docs=await listBrowser();
+  const db=await openDb();
+  const tx=db.transaction([DOCS,META],"readwrite");
+  const docsRequest=request(tx.objectStore(DOCS).getAll()) as Promise<Doc[]>;
+  const sequenceRequest=request(tx.objectStore(META).get(`seq-${year}`)) as Promise<Meta|undefined>;
+  const [docs,storedRow]=await Promise.all([docsRequest,sequenceRequest]);
   const maxDoc=docs.filter(d=>d.year===year).reduce((m,d)=>Math.max(m,d.sequence||0),0);
-  const stored=Number(await metaGet<number>(`seq-${year}`)||0);
+  const stored=Number(storedRow?.value||0);
   const sequence=Math.max(maxDoc,stored)+1;
-  await metaSet(`seq-${year}`,sequence);
+  tx.objectStore(META).put({key:`seq-${year}`,value:sequence} satisfies Meta);
+  await done(tx);db.close();
   const now=iso(),elnNumber=`ELN-${String(sequence).padStart(5,"0")}-${year}`;
   return {id:crypto.randomUUID(),elnNumber,sequence,year,title:elnNumber,experimentNumber:"",contentHtml:"",status:"draft",signerName:null,signedAt:null,deletedAt:null,createdAt:now,updatedAt:now,attachments:[]};
 }

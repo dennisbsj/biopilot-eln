@@ -35,6 +35,13 @@ describe("browser ELN storage",()=>{
     expect(docs[0].title).toBe("First ELN");
   });
 
+  it("allocates unique sequences across concurrent browser tabs",async()=>{
+    const created=await Promise.all(Array.from({length:10},()=>createBrowser()));
+    const sequences=created.map(d=>d.sequence).sort((a,b)=>a-b);
+    expect(sequences).toEqual([1,2,3,4,5,6,7,8,9,10]);
+    expect(new Set(created.map(d=>d.elnNumber)).size).toBe(10);
+  });
+
   it("coalesces rapid autosaves into one version",async()=>{
     const doc=await createBrowser();
     const saved=await saveBrowser(doc,"manual_save");
