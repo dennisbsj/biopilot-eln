@@ -9,7 +9,7 @@ The ELN is now split into two JavaScript applications in the same repository:
 - **Frontend:** React + TypeScript + Vite, deployed as the Render static site `biopilot-eln`.
 - **Frontend storage:** Browser IndexedDB is the default persistence layer, so the ELN does not depend on any paid or hosted database.
 - **Backend:** Node.js + Express, deployed as the Render web service `biopilot-eln-api`, mainly for optional API coupling.
-- **Optional database mode:** PostgreSQL is still supported if `VITE_STORAGE_MODE=server` is explicitly enabled.
+- **Optional database mode:** PostgreSQL remains supported for future use, but production does not require it. Server persistence is enabled only if `VITE_STORAGE_MODE=server` is explicitly set and the API has a working `DATABASE_URL`.
 
 This repository and application are intentionally standalone. They do not share a backend, login, database, repository, or runtime dependency with any other application. ELN can optionally connect to an external API through a narrow, configurable bridge without requiring access to that application's repository or backend code.
 
@@ -30,22 +30,25 @@ The ELN is browser-first. Documents, versions and attachments are stored in Inde
 - Soft delete / Trash / Restore / permanent delete
 - Attachments and inline image insertion
 - Print / Save as PDF
-- Automatic migration of existing browser-local ELNs when the server database becomes available
+- JSON Backup / Restore for browser-local documents, versions and attachments
+- Seven-day backup reminder when browser-local data exists
+- Protection against restoring altered content over existing Final/Signed ELNs
+- Atomic ELN-number allocation across concurrent browser tabs
 
 ## Backend
 
-Start locally:
+Start locally without a database:
 
 ```bash
 npm install
-DATABASE_URL=postgresql://... FRONTEND_ORIGIN=http://localhost:5173 npm run start:api
+FRONTEND_ORIGIN=http://localhost:5173 npm run start:api
 ```
 
-The API automatically creates its own PostgreSQL tables on startup.
+The API starts normally without PostgreSQL and can still provide the optional external API bridge. If `DATABASE_URL` is supplied, it also initializes the optional PostgreSQL persistence tables.
 
 Important environment variables:
 
-- `DATABASE_URL` — PostgreSQL connection string.
+- `DATABASE_URL` — optional PostgreSQL connection string. Leave unset for the normal browser-first deployment.
 - `FRONTEND_ORIGIN` — allowed browser origin.
 - `EXTERNAL_API_BASE_URL` — optional base URL for an external API.
 - `EXTERNAL_API_TOKEN` — optional bearer token used only when ELN calls that API.
@@ -63,16 +66,11 @@ VITE_API_URL=http://localhost:3001 npm run dev
 Production frontend: https://biopilot-eln.onrender.com  
 Production API: https://biopilot-eln-api.onrender.com
 
-## Data model
+## Storage and data model
 
-The backend creates these tables automatically:
+In the default production mode, ELN data is stored in the browser's IndexedDB database. Documents include attachment payloads, while version snapshots contain the document text/metadata history. Backup exports package the browser-local documents, versions, attachments and sequence state into one JSON file that can be restored later or on another browser.
 
-- `eln_documents`
-- `eln_versions`
-- `eln_attachments`
-- `eln_sequences`
-
-Attachments are currently stored in PostgreSQL. This keeps the deployment self-contained; for large-scale use they should later move to object storage while PostgreSQL retains their metadata.
+PostgreSQL is optional. When server persistence is deliberately enabled, the backend creates `eln_documents`, `eln_versions`, `eln_attachments` and `eln_sequences` automatically. The browser-first deployment does not require those tables or a database service.
 
 ## Compliance note
 
@@ -94,4 +92,4 @@ EXTERNAL_API_TOKEN=...
 
 ELN normalizes common response shapes such as an array, `results`, `items`, or `data`, and common experiment identifiers such as `experimentNumber`, `experiment_number`, `number`, `code`, or `id`.
 
-If the external API is not configured or is unavailable, ELN falls back to experiment numbers already present in its own ELN documents.
+If the external API is not configured or is unavailable, ELN falls back to experiment numbers already present in its own ELN documents. The external API bridge does not require PostgreSQL.
