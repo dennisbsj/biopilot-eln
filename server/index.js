@@ -261,18 +261,6 @@ app.delete("/api/documents/:docId/attachments/:attachmentId",requireDb,async(req
 app.get("/api/experiments",requireDb,async(req,res,next)=>{
   try{
     const q=String(req.query.q||"").trim();
-    const upstream=(process.env.BIOPILOT_API_BASE_URL||"").replace(/\/$/,"");
-    if(upstream&&q){
-      try{
-        const headers={Accept:"application/json"};
-        if(process.env.BIOPILOT_API_TOKEN)headers.Authorization=`Bearer ${process.env.BIOPILOT_API_TOKEN}`;
-        const r=await fetch(`${upstream}/experiments?search=${encodeURIComponent(q)}`,{headers});
-        if(r.ok){
-          const body=await r.json();const items=Array.isArray(body)?body:(body.results||body.items||body.data||[]);
-          return res.json(items.slice(0,20).map(x=>({experimentNumber:String(x.experimentNumber||x.number||x.id||""),title:String(x.title||x.name||"")})).filter(x=>x.experimentNumber));
-        }
-      }catch{}
-    }
     const {rows}=await pool.query(`SELECT experiment_number,MAX(title) AS title FROM eln_documents WHERE experiment_number<>'' AND experiment_number ILIKE $1 GROUP BY experiment_number ORDER BY experiment_number LIMIT 20`,[`%${q}%`]);
     res.json(rows.map(r=>({experimentNumber:r.experiment_number,title:r.title})));
   }catch(e){next(e)}
