@@ -7,12 +7,13 @@ Standalone browser-based Electronic Laboratory Notebook.
 The ELN is now split into two JavaScript applications in the same repository:
 
 - **Frontend:** React + TypeScript + Vite, deployed as the Render static site `biopilot-eln`.
-- **Backend:** Node.js + Express, deployed as the Render web service `biopilot-eln-api`.
-- **Database:** PostgreSQL on Render (`biopilot-eln-db`).
+- **Frontend storage:** Browser IndexedDB is the default persistence layer, so the ELN does not depend on any paid or hosted database.
+- **Backend:** Node.js + Express, deployed as the Render web service `biopilot-eln-api`, mainly for optional API coupling.
+- **Optional database mode:** PostgreSQL is still supported if `VITE_STORAGE_MODE=server` is explicitly enabled.
 
 This repository and application are intentionally standalone. They do not share a backend, login, database, repository, or runtime dependency with any other application. ELN can optionally connect to an external API through a narrow, configurable bridge without requiring access to that application's repository or backend code.
 
-The frontend talks only to its own ELN API through `VITE_API_URL`. If the API/database is unavailable, the app deliberately falls back to browser storage so the editor remains usable.
+The ELN is browser-first. Documents, versions and attachments are stored in IndexedDB on the current device by default. The frontend can still talk to its own ELN API through `VITE_API_URL` for optional external API lookup. Hosted database persistence is opt-in rather than required.
 
 ## Implemented ELN features
 
