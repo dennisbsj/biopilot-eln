@@ -163,6 +163,9 @@ export async function saveBrowser(doc:Doc,changeType="save"):Promise<Doc>{
       request(docStore.get(doc.id)) as Promise<Doc|undefined>,
       request(versionIndex.getAll(IDBKeyRange.only(doc.id))) as Promise<Version[]>
     ]);
+    if(existing&&existing.updatedAt!==doc.updatedAt){
+      throw new Error("This ELN was changed in another browser tab. Reopen it before saving.");
+    }
     if(existing&&existing.status!=="draft"){
       const isSign=changeType==="sign"&&existing.status==="final"&&doc.status==="signed";
       if(!isSign&&immutableFingerprint(existing)!==immutableFingerprint(doc)){
