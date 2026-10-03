@@ -101,6 +101,14 @@ async function getDoc(id){
   return docFromRow(rows[0],await attachmentsFor(id));
 }
 async function addVersion(client,doc,changeType){
+  if(changeType==="autosave"){
+    const latest=await client.query("SELECT id,changed_at,change_type FROM eln_versions WHERE document_id=$1 ORDER BY version_no DESC LIMIT 1",[doc.id]);
+    const row=latest.rows[0];
+    if(row&&row.change_type==="autosave"&&Date.now()-new Date(row.changed_at).getTime()<60_000){
+      await client.query(`UPDATE eln_versions SET title=$2,experiment_number=$3,content_html=$4,status=$5,signer_name=$6,signed_at=$7,changed_at=NOW() WHERE id=$1`,[row.id,doc.title,doc.experimentNumber,doc.contentHtml,doc.status,doc.signerName||null,doc.signedAt||null]);
+      return;
+    }
+  }
   const q=await client.query("SELECT COALESCE(MAX(version_no),0)+1 AS next FROM eln_versions WHERE document_id=$1",[doc.id]);
   const n=Number(q.rows[0].next);
   await client.query(`INSERT INTO eln_versions(document_id,version_no,title,experiment_number,content_html,status,signer_name,signed_at,change_type)
