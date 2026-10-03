@@ -20,3 +20,8 @@
   body{background:white;color:black}.appHeader,.editorTop,.recentStrip,.lockedNotice,.attachments,.meta,.toolbar,.browser,.overlay{display:none!important}
   .editor{width:100%;padding:0}.paperWrap{border:0;padding:0;background:white;min-height:0}.paper{max-width:none;box-shadow:none;border-radius:0;min-height:0}.documentTitleBar{padding:0 0 18px;border-bottom:1px solid #bbb}.documentTitle{font-size:24pt;color:black}.rich{padding:24px 0 0;min-height:0;color:black;font-size:11pt}
 }
+
+.editorAction.backupDue{border-color:#8b6b2b;background:#302718;color:#f2cf7a;box-shadow:0 0 0 2px rgba(242,207,122,.06)}
+.storageError{display:flex;align-items:center;justify-content:space-between;gap:12px;border:1px solid #7a3f45;background:#2d1d22;color:#ffb4ba;border-radius:9px;padding:10px 12px;margin-bottom:12px;font-size:12px}
+.storageError button{border:1px solid #8c4a51;background:#3a242a;color:#ffd2d6;border-radius:7px;padding:6px 9px}
+@media(max-width:560px){.storageError{align-items:stretch;flex-direction:column}}
