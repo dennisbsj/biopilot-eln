@@ -13,6 +13,11 @@ const MAX_ATTACHMENT_BYTES=15*1024*1024;
 type Meta={key:string;value:unknown};
 
 function iso(){return new Date().toISOString()}
+function nextIso(previous?:string|null){
+  const now=Date.now();
+  const prior=previous?new Date(previous).getTime():0;
+  return new Date(Math.max(now,Number.isFinite(prior)?prior+1:now)).toISOString();
+}
 
 function openDb():Promise<IDBDatabase>{
   return new Promise((resolve,reject)=>{
@@ -173,7 +178,7 @@ export async function saveBrowser(doc:Doc,changeType="save"):Promise<Doc>{
       }
     }
 
-    const updated={...doc,updatedAt:iso()};
+    const updated={...doc,updatedAt:nextIso(existing?.updatedAt)};
     docStore.put(updated);
 
     const versions=[...existingVersions].sort((a,b)=>b.versionNo-a.versionNo);
