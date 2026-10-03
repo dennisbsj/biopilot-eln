@@ -204,6 +204,21 @@ function Editor({
     const h=(e:KeyboardEvent)=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="s"){e.preventDefault();void save("manual_save").catch(()=>{})}};
     window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);
   },[doc,dirty,locked]);
+  useEffect(()=>{
+    if(!dirty||locked)return;
+    const h=(e:BeforeUnloadEvent)=>{e.preventDefault();e.returnValue=""};
+    window.addEventListener("beforeunload",h);return()=>window.removeEventListener("beforeunload",h);
+  },[dirty,locked]);
+
+  const navigateAfterSave=async(action:()=>void)=>{
+    if(dirty&&!locked){try{await save("manual_save")}catch{return}}
+    action();
+  };
+  const openHistory=async()=>{
+    let target=doc;
+    if(dirty&&!locked){try{target=await save("manual_save")}catch{return}}
+    onHistory(target);
+  };
 
   const chooseFile=()=>fileInput.current?.click();
   const uploadFile=async(file:File)=>{
@@ -221,23 +236,23 @@ function Editor({
       <div className="docId"><ScrollText size={17}/><b>{doc.elnNumber}</b><span className={`statusChip ${doc.status}`}>{doc.status}</span>{mode==="local"&&<span className="storageBadge">On this device</span>}</div>
       <span className={dirty?"status dirty":"status saved"}>{saving?"Saving…":dirty?<><span/> Unsaved changes</>:<><Check size={15}/> Saved {fmt(savedAt).split(",").pop()}</>}</span>
       {!locked&&<button className="save" type="button" onClick={()=>void save("manual_save").catch(()=>{})}><Save size={16}/> Save</button>}
-      <button className="editorAction" type="button" onClick={()=>onHistory(doc)}><History size={16}/> History</button>
+      <button className="editorAction" type="button" onClick={()=>void openHistory()}><History size={16}/> History</button>
       <button className="editorAction" type="button" onClick={()=>window.print()}><Printer size={16}/> Print / PDF</button>
       {mode==="local"&&<><button className={backupDue?"editorAction backupDue":"editorAction"} type="button" onClick={onBackup}><Download size={16}/> {backupDue?"Backup recommended":"Backup"}</button>
       <button className="editorAction" type="button" onClick={()=>restoreInput.current?.click()}><Upload size={16}/> Restore</button>
-      <input ref={restoreInput} type="file" accept="application/json,.json" hidden onChange={e=>{const file=e.target.files?.[0];if(file)onRestore(file);e.currentTarget.value=""}}/></>}
+      <input ref={restoreInput} type="file" accept="application/json,.json" hidden onChange={e=>{const file=e.target.files?.[0];if(file)void navigateAfterSave(()=>onRestore(file));e.currentTarget.value=""}}/></>}
       {!locked&&<><button className="editorAction" type="button" onClick={chooseFile}><Paperclip size={16}/> Attach</button><input ref={fileInput} type="file" hidden onChange={e=>{const file=e.target.files?.[0];if(file)void uploadFile(file).catch(err=>setSaveError(err instanceof Error?err.message:"Could not attach file"));e.currentTarget.value=""}}/></>}
       {doc.status==="draft"&&!doc.deletedAt&&<button className="editorAction finalAction" type="button" onClick={()=>void finalize()}><Check size={16}/> Finalize</button>}
       {doc.status==="final"&&!doc.deletedAt&&<button className="editorAction signAction" type="button" onClick={()=>void onSign(doc)}><Check size={16}/> Sign</button>}
       {!doc.deletedAt&&<button className="editorAction deleteCurrent" type="button" onClick={()=>onDelete(doc)}><Trash2 size={16}/> Delete</button>}
-      <button className="editorAction newDoc" type="button" onClick={onNew}><FilePlus2 size={16}/> New</button>
+      <button className="editorAction newDoc" type="button" onClick={()=>void navigateAfterSave(onNew)}><FilePlus2 size={16}/> New</button>
     </div>
     {saveError&&<div className="storageError"><span>{saveError}</span>{!locked&&<button type="button" onClick={()=>void save("manual_save").catch(()=>{})}>Retry save</button>}</div>}
 
     <section className="recentStrip">
-      <div className="recentHeader"><span>Recent ELNs</span><button type="button" onClick={onBrowse}><FolderOpen size={15}/> Browse</button></div>
+      <div className="recentHeader"><span>Recent ELNs</span><button type="button" onClick={()=>void navigateAfterSave(onBrowse)}><FolderOpen size={15}/> Browse</button></div>
       <div className="recentList">
-        {recent.length?recent.map(d=><button key={d.id} type="button" className={d.id===doc.id?"recentItem active":"recentItem"} onClick={()=>onOpen(d)}><b>{d.elnNumber}</b><small>{d.title||d.elnNumber}</small></button>):<span className="recentEmpty">No saved ELNs yet</span>}
+        {recent.length?recent.map(d=><button key={d.id} type="button" className={d.id===doc.id?"recentItem active":"recentItem"} onClick={()=>void navigateAfterSave(()=>onOpen(d))}><b>{d.elnNumber}</b><small>{d.title||d.elnNumber}</small></button>):<span className="recentEmpty">No saved ELNs yet</span>}
       </div>
     </section>
 
