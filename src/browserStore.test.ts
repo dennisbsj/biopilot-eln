@@ -91,6 +91,7 @@ describe("browser ELN storage",()=>{
     const original=await saveBrowser(await createBrowser(),"manual_save");
     const payload=JSON.parse(await exportBrowserBackup());
     payload.documents[0].id=crypto.randomUUID();
+    payload.versions=[];
     await expect(importBrowserBackup(JSON.stringify(payload))).rejects.toThrow(/conflict/i);
     expect((await listBrowser()).find(d=>d.id===original.id)).toBeTruthy();
   });
