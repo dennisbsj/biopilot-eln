@@ -13,7 +13,7 @@ The ELN is now split into two JavaScript applications in the same repository:
 
 This repository and application are intentionally standalone. They do not share a backend, login, database, repository, or runtime dependency with any other application. ELN can optionally connect to an external API through a narrow, configurable bridge without requiring access to that application's repository or backend code.
 
-The ELN is browser-first. Documents, versions and attachments are stored in IndexedDB on the current device by default. The frontend can still talk to its own ELN API through `VITE_API_URL` for optional external API lookup. Hosted database persistence is opt-in rather than required.
+The ELN is browser-first. Documents, versions and attachments are stored in IndexedDB on the current device by default. The frontend can still talk to its own ELN API through `VITE_API_URL` for optional external API lookup. Hosted database persistence is opt-in rather than required. The API continues to start and serve the external lookup bridge even when PostgreSQL is absent or unavailable.
 
 ## Implemented ELN features
 
@@ -51,6 +51,7 @@ Important environment variables:
 - `EXTERNAL_API_TOKEN` — optional bearer token used only when ELN calls that API.
 - `EXTERNAL_EXPERIMENTS_PATH` — optional experiment-search path, default `/experiments`.
 - `EXTERNAL_EXPERIMENTS_QUERY_PARAM` — optional query parameter name, default `search`.
+- `EXTERNAL_API_TIMEOUT_MS` — optional external lookup timeout, default 5000 ms (clamped to 500–30000 ms).
 
 ## Frontend
 

@@ -15,6 +15,7 @@ app.use(cors({origin:[frontendOrigin,"http://localhost:5173"],credentials:false}
 app.use(express.json({limit:"10mb"}));
 
 const pool=databaseUrl?new Pool({connectionString:databaseUrl,ssl:databaseUrl.includes("localhost")?false:{rejectUnauthorized:false}}):null;
+let databaseReady=false;
 const upload=multer({storage:multer.memoryStorage(),limits:{fileSize:15*1024*1024,files:1}});
 
 const cleanHtml=(html="")=>sanitizeHtml(String(html),{
@@ -25,8 +26,9 @@ const cleanHtml=(html="")=>sanitizeHtml(String(html),{
 });
 
 async function initDb(){
-  if(!pool)return;
-  await pool.query(`
+  if(!pool){databaseReady=false;return false}
+  try{
+    await pool.query(`
     CREATE TABLE IF NOT EXISTS eln_sequences(
       year INTEGER PRIMARY KEY,
       last_value INTEGER NOT NULL DEFAULT 0
@@ -73,9 +75,16 @@ async function initDb(){
     CREATE INDEX IF NOT EXISTS eln_documents_experiment_idx ON eln_documents(experiment_number);
     CREATE INDEX IF NOT EXISTS eln_versions_document_idx ON eln_versions(document_id,version_no DESC);
   `);
+    databaseReady=true;
+    return true;
+  }catch(err){
+    databaseReady=false;
+    console.error("Database initialization failed; continuing without database",err?.message||err);
+    return false;
+  }
 }
 
-const requireDb=(req,res,next)=>{if(!pool)return res.status(503).json({error:"Database is not configured"});next()};
+const requireDb=(req,res,next)=>{if(!pool||!databaseReady)return res.status(503).json({error:"Database is unavailable"});next()};
 
 function docFromRow(r,attachments=[]){
   return {
@@ -117,7 +126,14 @@ async function addVersion(client,doc,changeType){
 
 app.get("/health",async(req,res)=>{
   if(!pool)return res.json({ok:true,database:false});
-  try{await pool.query("SELECT 1");res.json({ok:true,database:true})}catch(e){res.status(503).json({ok:false,database:false,error:String(e.message||e)})}
+  try{
+    await pool.query("SELECT 1");
+    databaseReady=true;
+    res.json({ok:true,database:true});
+  }catch(e){
+    databaseReady=false;
+    res.json({ok:true,database:false});
+  }
 });
 
 app.get("/api/documents",requireDb,async(req,res,next)=>{
@@ -276,7 +292,8 @@ app.get("/api/experiments",async(req,res,next)=>{
         }
         const separator=experimentsPath.includes("?")?"&":"?";
         const url=`${externalBase}${experimentsPath}${separator}${encodeURIComponent(queryParam)}=${encodeURIComponent(q)}`;
-        const r=await fetch(url,{headers});
+        const timeoutMs=Math.min(30_000,Math.max(500,Number(process.env.EXTERNAL_API_TIMEOUT_MS||5_000)||5_000));
+        const r=await fetch(url,{headers,signal:AbortSignal.timeout(timeoutMs)});
         if(r.ok){
           const body=await r.json();
           const items=Array.isArray(body)?body:(body.results||body.items||body.data||[]);
@@ -298,7 +315,7 @@ app.get("/api/experiments",async(req,res,next)=>{
       }
     }
 
-    if(!pool)return res.json([]);
+    if(!pool||!databaseReady)return res.json([]);
     const {rows}=await pool.query(`SELECT experiment_number,MAX(title) AS title FROM eln_documents WHERE experiment_number<>'' AND experiment_number ILIKE $1 GROUP BY experiment_number ORDER BY experiment_number LIMIT 20`,[`%${q}%`]);
     res.json(rows.map(r=>({experimentNumber:r.experiment_number,title:r.title})));
   }catch(e){next(e)}
@@ -338,4 +355,4 @@ app.use((err,req,res,next)=>{
   res.status(500).json({error:"Server error"});
 });
 
-initDb().then(()=>app.listen(port,()=>console.log(`BioPilot ELN API listening on ${port}; database ${pool?"configured":"not configured"}`))).catch(err=>{console.error("Database initialization failed",err);process.exit(1)});
+initDb().then(()=>app.listen(port,()=>console.log(`BioPilot ELN API listening on ${port}; database ${databaseReady?"connected":"optional/unavailable"}`)));
