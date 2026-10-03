@@ -45,8 +45,8 @@ describe("browser ELN storage",()=>{
   it("coalesces rapid autosaves into one version",async()=>{
     const doc=await createBrowser();
     const saved=await saveBrowser(doc,"manual_save");
-    await saveBrowser({...saved,contentHtml:"<p>A</p>"},"autosave");
-    await saveBrowser({...saved,contentHtml:"<p>B</p>"},"autosave");
+    const firstAutosave=await saveBrowser({...saved,contentHtml:"<p>A</p>"},"autosave");
+    await saveBrowser({...firstAutosave,contentHtml:"<p>B</p>"},"autosave");
 
     const versions=await versionsBrowser(doc.id);
     expect(versions).toHaveLength(2);
