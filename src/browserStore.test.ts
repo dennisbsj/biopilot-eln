@@ -54,12 +54,24 @@ describe("browser ELN storage",()=>{
     expect(versions[0].contentHtml).toBe("<p>B</p>");
   });
 
-  it("commits document saves and version numbers atomically across concurrent writes",async()=>{
-    const initial=await saveBrowser(await createBrowser(),"manual_save");
-    await Promise.all(Array.from({length:5},(_,i)=>saveBrowser({...initial,contentHtml:`<p>${i}</p>`},"manual_save")));
-    const versions=await versionsBrowser(initial.id);
+  it("keeps version numbers sequential across serial atomic saves",async()=>{
+    let current=await saveBrowser(await createBrowser(),"manual_save");
+    for(let i=0;i<5;i++)current=await saveBrowser({...current,contentHtml:`<p>${i}</p>`},"manual_save");
+    const versions=await versionsBrowser(current.id);
     expect(versions).toHaveLength(6);
     expect(versions.map(v=>v.versionNo).sort((a,b)=>a-b)).toEqual([1,2,3,4,5,6]);
+  });
+
+  it("rejects stale writes from another browser tab",async()=>{
+    const initial=await saveBrowser(await createBrowser(),"manual_save");
+    const tabA={...initial,contentHtml:"<p>Tab A</p>"};
+    const tabB={...initial,contentHtml:"<p>Tab B</p>"};
+    const savedA=await saveBrowser(tabA,"manual_save");
+    await expect(saveBrowser(tabB,"manual_save")).rejects.toThrow(/another browser tab/i);
+    const stored=(await listBrowser()).find(d=>d.id===initial.id);
+    expect(stored?.contentHtml).toBe("<p>Tab A</p>");
+    expect(stored?.updatedAt).toBe(savedA.updatedAt);
+    expect(await versionsBrowser(initial.id)).toHaveLength(2);
   });
 
   it("locks final documents against content changes but still permits trash operations",async()=>{
