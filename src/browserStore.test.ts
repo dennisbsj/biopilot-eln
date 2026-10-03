@@ -54,6 +54,14 @@ describe("browser ELN storage",()=>{
     expect(versions[0].contentHtml).toBe("<p>B</p>");
   });
 
+  it("commits document saves and version numbers atomically across concurrent writes",async()=>{
+    const initial=await saveBrowser(await createBrowser(),"manual_save");
+    await Promise.all(Array.from({length:5},(_,i)=>saveBrowser({...initial,contentHtml:`<p>${i}</p>`},"manual_save")));
+    const versions=await versionsBrowser(initial.id);
+    expect(versions).toHaveLength(6);
+    expect(versions.map(v=>v.versionNo).sort((a,b)=>a-b)).toEqual([1,2,3,4,5,6]);
+  });
+
   it("locks final documents against content changes but still permits trash operations",async()=>{
     const draft=await saveBrowser(await createBrowser(),"manual_save");
     const final=await saveBrowser({...draft,status:"final"},"finalize");
