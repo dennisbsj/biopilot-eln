@@ -291,7 +291,7 @@ export default function App(){
     if(current.id===doc.id){setCurrent(await data.create(mode));setScreen("editor")}
   })()};
   const restoreDoc=(d:Doc)=>{void (async()=>{await data.restore(mode,d.id);await refresh()})()};
-  const showHistory=(d:Doc)=>{void (async()=>{setHistoryDoc(d);setHistoryVersions(await data.versions(mode,d.id)})()};
+  const showHistory=(d:Doc)=>{void (async()=>{setHistoryDoc(d);setHistoryVersions(await data.versions(mode,d.id))})()};
   const finalize=async()=>{await refresh()};
   const signDoc=async(d:Doc)=>{
     const name=prompt("Signer name");if(!name?.trim())return;
