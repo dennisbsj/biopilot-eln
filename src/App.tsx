@@ -1,18 +1,22 @@
 import {useEffect,useMemo,useRef,useState} from "react";
 import type {MouseEvent as ReactMouseEvent} from "react";
 import {
-  AlignCenter,AlignLeft,AlignRight,ArrowLeft,Bold,Check,CheckSquare,FilePlus2,
+  AlignCenter,AlignLeft,AlignRight,ArrowLeft,Bold,Check,CheckSquare,Download,FilePlus2,
   FolderOpen,Highlighter,History,Italic,Link,List,ListOrdered,Microscope,Minus,
   Paperclip,Printer,Quote,Redo2,RemoveFormatting,RotateCcw,Save,ScrollText,Search,
-  Subscript,Superscript,Table2,Trash2,Underline,Undo2,X
+  Subscript,Superscript,Table2,Trash2,Underline,Undo2,Upload,X
 } from "lucide-react";
 import type {Attachment,Doc,Version} from "./types";
 import * as data from "./data";
 import type {Mode} from "./data";
-import {createLocal,loadAll} from "./localStore";
 
 type Screen="browse"|"editor";
 type PendingDelete={doc:Doc;permanent:boolean}|null;
+
+function placeholderDoc():Doc{
+  const now=new Date().toISOString();
+  return {id:crypto.randomUUID(),elnNumber:"Loading…",sequence:0,year:new Date().getFullYear(),title:"Loading…",experimentNumber:"",contentHtml:"",status:"draft",signerName:null,signedAt:null,deletedAt:null,createdAt:now,updatedAt:now,attachments:[]};
+}
 
 function fmt(v:string|null|undefined){
   if(!v)return "—";
@@ -151,7 +155,7 @@ function Confirm({doc,permanent,cancel,confirm}:{doc:Doc;permanent:boolean;cance
 }
 
 function Editor({
-  doc,docs,mode,onChange,onSave,onBrowse,onNew,onDelete,onOpen,onHistory,onFinalize,onSign,onUpload,onDeleteAttachment,onSearchExperiments
+  doc,docs,mode,onChange,onSave,onBrowse,onNew,onDelete,onOpen,onHistory,onFinalize,onSign,onUpload,onDeleteAttachment,onSearchExperiments,onBackup,onRestore
 }:{
   doc:Doc;docs:Doc[];mode:Mode;onChange:(d:Doc)=>void;onSave:(d:Doc,changeType?:string)=>Promise<Doc>;
   onBrowse:()=>void;onNew:()=>void;onDelete:(d:Doc)=>void;onOpen:(d:Doc)=>void;onHistory:(d:Doc)=>void;
@@ -160,6 +164,7 @@ function Editor({
 }){
   const editor=useRef<HTMLDivElement>(null);
   const fileInput=useRef<HTMLInputElement>(null);
+  const restoreInput=useRef<HTMLInputElement>(null);
   const[dirty,setDirty]=useState(false);
   const[saving,setSaving]=useState(false);
   const[savedAt,setSavedAt]=useState(doc.updatedAt);
@@ -206,11 +211,14 @@ function Editor({
 
   return <main className="editor">
     <div className="editorTop">
-      <div className="docId"><ScrollText size={17}/><b>{doc.elnNumber}</b><span className={`statusChip ${doc.status}`}>{doc.status}</span>{mode==="local"&&<span className="storageBadge">Browser storage</span>}</div>
+      <div className="docId"><ScrollText size={17}/><b>{doc.elnNumber}</b><span className={`statusChip ${doc.status}`}>{doc.status}</span>{mode==="local"&&<span className="storageBadge">On this device</span>}</div>
       <span className={dirty?"status dirty":"status saved"}>{saving?"Saving…":dirty?<><span/> Unsaved changes</>:<><Check size={15}/> Saved {fmt(savedAt).split(",").pop()}</>}</span>
       {!locked&&<button className="save" type="button" onClick={()=>void save("manual_save")}><Save size={16}/> Save</button>}
       <button className="editorAction" type="button" onClick={()=>onHistory(doc)}><History size={16}/> History</button>
       <button className="editorAction" type="button" onClick={()=>window.print()}><Printer size={16}/> Print / PDF</button>
+      <button className="editorAction" type="button" onClick={onBackup}><Download size={16}/> Backup</button>
+      <button className="editorAction" type="button" onClick={()=>restoreInput.current?.click()}><Upload size={16}/> Restore</button>
+      <input ref={restoreInput} type="file" accept="application/json,.json" hidden onChange={e=>{const file=e.target.files?.[0];if(file)onRestore(file);e.currentTarget.value=""}}/>
       {!locked&&<><button className="editorAction" type="button" onClick={chooseFile}><Paperclip size={16}/> Attach</button><input ref={fileInput} type="file" hidden onChange={e=>{const file=e.target.files?.[0];if(file)void uploadFile(file);e.currentTarget.value=""}}/></>}
       {doc.status==="draft"&&!doc.deletedAt&&<button className="editorAction finalAction" type="button" onClick={()=>void finalize()}><Check size={16}/> Finalize</button>}
       {doc.status==="final"&&!doc.deletedAt&&<button className="editorAction signAction" type="button" onClick={()=>void onSign(doc)}><Check size={16}/> Sign</button>}
@@ -251,8 +259,8 @@ function Editor({
 export default function App(){
   const[screen,setScreen]=useState<Screen>("editor");
   const[mode,setMode]=useState<Mode>("local");
-  const[docs,setDocs]=useState<Doc[]>(()=>loadAll());
-  const[current,setCurrent]=useState<Doc>(()=>createLocal());
+  const[docs,setDocs]=useState<Doc[]>([]);
+  const[current,setCurrent]=useState<Doc>(()=>placeholderDoc());
   const[pendingDelete,setPendingDelete]=useState<PendingDelete>(null);
   const[historyDoc,setHistoryDoc]=useState<Doc|null>(null);
   const[historyVersions,setHistoryVersions]=useState<Version[]>([]);
@@ -265,9 +273,17 @@ export default function App(){
       const detected=await data.detectMode();
       if(cancelled)return;
       setMode(detected);
-      if(detected==="server"){
-        try{await data.migrateLocalIfNeeded();const all=await data.list("server");if(cancelled)return;setDocs(all);setCurrent(await data.create("server"))}
-        catch{setMode("local");setDocs(loadAll())}
+      try{
+        if(detected==="server")await data.migrateLocalIfNeeded();
+        const all=await data.list(detected);
+        const next=await data.create(detected);
+        if(cancelled)return;
+        setDocs(all);setCurrent(next);
+      }catch{
+        const all=await data.list("local");
+        const next=await data.create("local");
+        if(cancelled)return;
+        setMode("local");setDocs(all);setCurrent(next);
       }
     })();
     return()=>{cancelled=true};
@@ -300,10 +316,28 @@ export default function App(){
   const upload=async(d:Doc,file:File)=>{const a=await data.upload(mode,d.id,file);await refresh();return a};
   const deleteAttachment=async(d:Doc,a:Attachment)=>{await data.deleteAttachment(mode,d.id,a.id);const all=await refresh();const updated=all.find(x=>x.id===d.id);if(updated)setCurrent(updated)};
   const searchExperiments=(q:string)=>data.searchExperiments(mode,q,docs);
+  const backup=()=>{void (async()=>{
+    const text=await data.exportBackup();
+    const blob=new Blob([text],{type:"application/json"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;a.download=`biopilot-eln-backup-${new Date().toISOString().slice(0,10)}.json`;a.click();
+    URL.revokeObjectURL(url);
+  })()};
+  const restoreBackup=(file:File)=>{void (async()=>{
+    if(!confirm("Restore this ELN backup? Existing documents with the same IDs will be updated."))return;
+    try{
+      await data.importBackup(await file.text());
+      setMode("local");
+      const all=await data.list("local");setDocs(all);
+      setCurrent(all.filter(d=>!d.deletedAt).sort((a,b)=>new Date(b.updatedAt).getTime()-new Date(a.updatedAt).getTime())[0]||await data.create("local"));
+      alert("Backup restored.");
+    }catch(e){alert(e instanceof Error?e.message:"Could not restore backup.")}
+  })()};
 
   return <div className="app"><Header editor={showEditor}/>
     {screen==="browse"&&<Browser docs={docs} back={showEditor} open={openDoc} remove={d=>requestDelete(d)} restore={restoreDoc} permanent={d=>requestDelete(d,true)}/>}
-    {screen==="editor"&&<Editor doc={current} docs={docs} mode={mode} onChange={setCurrent} onSave={saveDoc} onBrowse={()=>setScreen("browse")} onNew={newDoc} onDelete={d=>requestDelete(d)} onOpen={openDoc} onHistory={showHistory} onFinalize={finalize} onSign={signDoc} onUpload={upload} onDeleteAttachment={deleteAttachment} onSearchExperiments={searchExperiments}/>}
+    {screen==="editor"&&<Editor doc={current} docs={docs} mode={mode} onChange={setCurrent} onSave={saveDoc} onBrowse={()=>setScreen("browse")} onNew={newDoc} onDelete={d=>requestDelete(d)} onOpen={openDoc} onHistory={showHistory} onFinalize={finalize} onSign={signDoc} onUpload={upload} onDeleteAttachment={deleteAttachment} onSearchExperiments={searchExperiments} onBackup={backup} onRestore={restoreBackup}/>}
     {pendingDelete&&<Confirm doc={pendingDelete.doc} permanent={pendingDelete.permanent} cancel={()=>setPendingDelete(null)} confirm={confirmDelete}/>}
     {historyDoc&&<HistoryModal doc={historyDoc} versions={historyVersions} close={()=>{setHistoryDoc(null);setHistoryVersions([])}}/>}
   </div>;
