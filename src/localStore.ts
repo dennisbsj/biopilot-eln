@@ -64,6 +64,11 @@ export function listLocal():Doc[]{return loadAll()}
 
 function addVersion(doc:Doc,changeType:string){
   const versions=read<Version[]>(VERSIONS_KEY,[]);
+  const latest=versions.filter(v=>v.documentId===doc.id).sort((a,b)=>b.versionNo-a.versionNo)[0];
+  if(changeType==="autosave"&&latest?.changeType==="autosave"&&Date.now()-new Date(latest.changedAt).getTime()<60_000){
+    const updated=versions.map(v=>v.id===latest.id?{...v,title:doc.title,experimentNumber:doc.experimentNumber,contentHtml:doc.contentHtml,status:doc.status,signerName:doc.signerName,signedAt:doc.signedAt,changedAt:iso()}:v);
+    write(VERSIONS_KEY,updated);return;
+  }
   const versionNo=versions.filter(v=>v.documentId===doc.id).reduce((m,v)=>Math.max(m,v.versionNo),0)+1;
   versions.unshift({
     id:crypto.randomUUID(),documentId:doc.id,versionNo,title:doc.title,experimentNumber:doc.experimentNumber,
