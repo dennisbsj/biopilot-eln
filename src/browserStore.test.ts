@@ -95,4 +95,27 @@ describe("browser ELN storage",()=>{
     await expect(importBrowserBackup(JSON.stringify(payload))).rejects.toThrow(/conflict/i);
     expect((await listBrowser()).find(d=>d.id===original.id)).toBeTruthy();
   });
+  it("does not let restore alter a Final or Signed ELN",async()=>{
+    const draft=await saveBrowser({...await createBrowser(),contentHtml:"<p>Original</p>"},"manual_save");
+    const final=await saveBrowser({...draft,status:"final"},"finalize");
+    const backup=JSON.parse(await exportBrowserBackup());
+    backup.documents[0].contentHtml="<p>Tampered</p>";
+    backup.versions=[];
+    await expect(importBrowserBackup(JSON.stringify(backup))).rejects.toThrow(/immutable/i);
+    expect((await listBrowser()).find(d=>d.id===final.id)?.contentHtml).toBe("<p>Original</p>");
+  });
+
+  it("rejects duplicate document and version identifiers in backups",async()=>{
+    const doc=await saveBrowser(await createBrowser(),"manual_save");
+    const payload=JSON.parse(await exportBrowserBackup());
+    payload.documents.push({...payload.documents[0]});
+    await expect(importBrowserBackup(JSON.stringify(payload))).rejects.toThrow(/duplicate document ID/i);
+
+    const valid=JSON.parse(await exportBrowserBackup());
+    expect(valid.versions.length).toBeGreaterThan(0);
+    valid.versions.push({...valid.versions[0]});
+    await expect(importBrowserBackup(JSON.stringify(valid))).rejects.toThrow(/duplicate version ID/i);
+    expect((await listBrowser()).some(d=>d.id===doc.id)).toBe(true);
+  });
+
 });
