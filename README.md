@@ -10,7 +10,7 @@ The ELN is now split into two JavaScript applications in the same repository:
 - **Backend:** Node.js + Express, deployed as the Render web service `biopilot-eln-api`.
 - **Database:** PostgreSQL on Render (`biopilot-eln-db`).
 
-This repository and application are intentionally standalone. They do not share a backend, login, database, repository, or runtime dependency with the main BioPilot platform or Flow Studio.
+This repository and application are intentionally standalone. They do not share a backend, login, database, repository, or runtime dependency with any other application. ELN can optionally connect to an external API through a narrow, configurable bridge without requiring access to that application's repository or backend code.
 
 The frontend talks only to its own ELN API through `VITE_API_URL`. If the API/database is unavailable, the app deliberately falls back to browser storage so the editor remains usable.
 
@@ -46,6 +46,10 @@ Important environment variables:
 
 - `DATABASE_URL` — PostgreSQL connection string.
 - `FRONTEND_ORIGIN` — allowed browser origin.
+- `EXTERNAL_API_BASE_URL` — optional base URL for an external API.
+- `EXTERNAL_API_TOKEN` — optional bearer token used only when ELN calls that API.
+- `EXTERNAL_EXPERIMENTS_PATH` — optional experiment-search path, default `/experiments`.
+- `EXTERNAL_EXPERIMENTS_QUERY_PARAM` — optional query parameter name, default `search`.
 
 ## Frontend
 
@@ -71,3 +75,21 @@ Attachments are currently stored in PostgreSQL. This keeps the deployment self-c
 ## Compliance note
 
 The current Final/Signed workflow provides immutability and an audit history at the application level. It should not be described as a validated GxP / 21 CFR Part 11 / Annex 11 electronic-signature system without the additional identity, authorization, validation and operational controls required for such use.
+
+
+## Optional external API coupling
+
+ELN does not need source-code access to another application. To enable experiment lookup, configure the ELN backend with an external API URL and, if required, a token. The external system only needs to expose an HTTP endpoint.
+
+Example:
+
+```bash
+EXTERNAL_API_BASE_URL=https://example.internal
+EXTERNAL_EXPERIMENTS_PATH=/api/experiments
+EXTERNAL_EXPERIMENTS_QUERY_PARAM=search
+EXTERNAL_API_TOKEN=...
+```
+
+ELN normalizes common response shapes such as an array, `results`, `items`, or `data`, and common experiment identifiers such as `experimentNumber`, `experiment_number`, `number`, `code`, or `id`.
+
+If the external API is not configured or is unavailable, ELN falls back to experiment numbers already present in its own ELN documents.
