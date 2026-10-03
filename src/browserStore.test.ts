@@ -1,3 +1,4 @@
+import "./test/setup";
 import {beforeEach,describe,expect,it} from "vitest";
 import {
   backupStatus,createBrowser,exportBrowserBackup,importBrowserBackup,listBrowser,
