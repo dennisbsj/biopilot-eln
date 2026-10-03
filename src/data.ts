@@ -42,3 +42,4 @@ export async function searchExperiments(mode:Mode,q:string,docs:Doc[]){
 export const attachmentUrl=(a:Attachment)=>a.url||(a.dataUrl||"");
 export async function exportBackup(){return browser.exportBrowserBackup()}
 export async function importBackup(text:string){return browser.importBrowserBackup(text)}
+export async function backupStatus(){return browser.backupStatus()}
