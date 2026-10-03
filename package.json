@@ -1,13 +1,15 @@
 {
   "name": "biopilot-eln",
   "private": true,
-  "version": "0.4.0",
+  "version": "0.4.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "start:api": "node server/index.js"
+    "start:api": "node server/index.js",
+    "test": "vitest run",
+    "check": "npm run test && npm run build"
   },
   "dependencies": {
     "cors": "^2.8.5",
@@ -24,6 +26,8 @@
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.4",
     "typescript": "^5.7.2",
-    "vite": "^6.0.1"
+    "vite": "^6.0.1",
+    "fake-indexeddb": "^6.0.0",
+    "vitest": "^2.1.8"
   }
 }
