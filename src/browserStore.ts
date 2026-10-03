@@ -151,30 +151,46 @@ export async function createBrowser():Promise<Doc>{
   return {id:crypto.randomUUID(),elnNumber,sequence,year,title:elnNumber,experimentNumber:"",contentHtml:"",status:"draft",signerName:null,signedAt:null,deletedAt:null,createdAt:now,updatedAt:now,attachments:[]};
 }
 
-async function addVersion(doc:Doc,changeType:string){
-  const existing=await versionsBrowser(doc.id);
-  const latest=existing[0];
-  if(changeType==="autosave"&&latest?.changeType==="autosave"&&Date.now()-new Date(latest.changedAt).getTime()<60_000){
-    const updated={...latest,title:doc.title,experimentNumber:doc.experimentNumber,contentHtml:doc.contentHtml,status:doc.status,signerName:doc.signerName,signedAt:doc.signedAt,changedAt:iso()};
-    const db=await openDb();const tx=db.transaction(VERSIONS,"readwrite");tx.objectStore(VERSIONS).put(updated);await done(tx);db.close();return;
-  }
-  const versionNo=existing.reduce((m,v)=>Math.max(m,v.versionNo),0)+1;
-  const version:Version={id:crypto.randomUUID(),documentId:doc.id,versionNo,title:doc.title,experimentNumber:doc.experimentNumber,contentHtml:doc.contentHtml,status:doc.status,signerName:doc.signerName,signedAt:doc.signedAt,changedAt:iso(),changeType};
-  const db=await openDb();const tx=db.transaction(VERSIONS,"readwrite");tx.objectStore(VERSIONS).put(version);await done(tx);db.close();
-}
-
 export async function saveBrowser(doc:Doc,changeType="save"):Promise<Doc>{
   await ensureMigrated();
-  const existing=await storedDoc(doc.id);
-  if(existing&&existing.status!=="draft"){
-    const isSign=changeType==="sign"&&existing.status==="final"&&doc.status==="signed";
-    if(!isSign&&immutableFingerprint(existing)!==immutableFingerprint(doc)){
-      throw new Error("Final and signed ELNs are immutable");
+  const db=await openDb();
+  const tx=db.transaction([DOCS,VERSIONS],"readwrite");
+  const docStore=tx.objectStore(DOCS);
+  const versionStore=tx.objectStore(VERSIONS);
+  const versionIndex=versionStore.index("documentId");
+  try{
+    const [existing,existingVersions]=await Promise.all([
+      request(docStore.get(doc.id)) as Promise<Doc|undefined>,
+      request(versionIndex.getAll(IDBKeyRange.only(doc.id))) as Promise<Version[]>
+    ]);
+    if(existing&&existing.status!=="draft"){
+      const isSign=changeType==="sign"&&existing.status==="final"&&doc.status==="signed";
+      if(!isSign&&immutableFingerprint(existing)!==immutableFingerprint(doc)){
+        throw new Error("Final and signed ELNs are immutable");
+      }
     }
+
+    const updated={...doc,updatedAt:iso()};
+    docStore.put(updated);
+
+    const versions=[...existingVersions].sort((a,b)=>b.versionNo-a.versionNo);
+    const latest=versions[0];
+    if(changeType==="autosave"&&latest?.changeType==="autosave"&&Date.now()-new Date(latest.changedAt).getTime()<60_000){
+      versionStore.put({...latest,title:updated.title,experimentNumber:updated.experimentNumber,contentHtml:updated.contentHtml,status:updated.status,signerName:updated.signerName,signedAt:updated.signedAt,changedAt:iso()});
+    }else{
+      const versionNo=versions.reduce((m,v)=>Math.max(m,v.versionNo),0)+1;
+      const version:Version={id:crypto.randomUUID(),documentId:updated.id,versionNo,title:updated.title,experimentNumber:updated.experimentNumber,contentHtml:updated.contentHtml,status:updated.status,signerName:updated.signerName,signedAt:updated.signedAt,changedAt:iso(),changeType};
+      versionStore.put(version);
+    }
+
+    await done(tx);
+    db.close();
+    return updated;
+  }catch(e){
+    try{tx.abort()}catch{}
+    db.close();
+    throw e;
   }
-  const updated={...doc,updatedAt:iso()};
-  const db=await openDb();const tx=db.transaction(DOCS,"readwrite");tx.objectStore(DOCS).put(updated);await done(tx);db.close();
-  await addVersion(updated,changeType);return updated;
 }
 
 export async function softDeleteBrowser(id:string):Promise<Doc>{
