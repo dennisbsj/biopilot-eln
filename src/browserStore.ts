@@ -13,6 +13,11 @@ const MAX_ATTACHMENT_BYTES=15*1024*1024;
 type Meta={key:string;value:unknown};
 
 function iso(){return new Date().toISOString()}
+function nextIso(previous?:string|null){
+  const now=Date.now();
+  const prior=previous?new Date(previous).getTime():0;
+  return new Date(Math.max(now,Number.isFinite(prior)?prior+1:now)).toISOString();
+}
 
 function openDb():Promise<IDBDatabase>{
   return new Promise((resolve,reject)=>{
@@ -163,6 +168,9 @@ export async function saveBrowser(doc:Doc,changeType="save"):Promise<Doc>{
       request(docStore.get(doc.id)) as Promise<Doc|undefined>,
       request(versionIndex.getAll(IDBKeyRange.only(doc.id))) as Promise<Version[]>
     ]);
+    if(existing&&existing.updatedAt!==doc.updatedAt){
+      throw new Error("This ELN was changed in another browser tab. Reopen it before saving.");
+    }
     if(existing&&existing.status!=="draft"){
       const isSign=changeType==="sign"&&existing.status==="final"&&doc.status==="signed";
       if(!isSign&&immutableFingerprint(existing)!==immutableFingerprint(doc)){
@@ -170,7 +178,7 @@ export async function saveBrowser(doc:Doc,changeType="save"):Promise<Doc>{
       }
     }
 
-    const updated={...doc,updatedAt:iso()};
+    const updated={...doc,updatedAt:nextIso(existing?.updatedAt)};
     docStore.put(updated);
 
     const versions=[...existingVersions].sort((a,b)=>b.versionNo-a.versionNo);
