@@ -258,7 +258,7 @@ app.delete("/api/documents/:docId/attachments/:attachmentId",requireDb,async(req
   }catch(e){next(e)}
 });
 
-app.get("/api/experiments",requireDb,async(req,res,next)=>{
+app.get("/api/experiments",async(req,res,next)=>{
   try{
     const q=String(req.query.q||"").trim();
 
@@ -298,6 +298,7 @@ app.get("/api/experiments",requireDb,async(req,res,next)=>{
       }
     }
 
+    if(!pool)return res.json([]);
     const {rows}=await pool.query(`SELECT experiment_number,MAX(title) AS title FROM eln_documents WHERE experiment_number<>'' AND experiment_number ILIKE $1 GROUP BY experiment_number ORDER BY experiment_number LIMIT 20`,[`%${q}%`]);
     res.json(rows.map(r=>({experimentNumber:r.experiment_number,title:r.title})));
   }catch(e){next(e)}
