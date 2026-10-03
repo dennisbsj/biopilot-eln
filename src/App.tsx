@@ -1,6 +1,6 @@
 import {useEffect,useMemo,useRef,useState} from "react";
 import {
-  AlignCenter,AlignLeft,AlignRight,ArrowLeft,Bold,Check,ChevronRight,
+  AlignCenter,AlignLeft,AlignRight,ArrowLeft,Bold,Check,
   FilePlus2,FolderOpen,Italic,Link,List,ListOrdered,Microscope,Quote,
   Redo2,RemoveFormatting,Save,ScrollText,Search,Trash2,Underline,Undo2,X
 } from "lucide-react";
@@ -9,7 +9,7 @@ type Doc={
   id:string; elnNumber:string; sequence:number; year:number; title:string;
   experimentNumber:string; contentHtml:string; createdAt:string; updatedAt:string;
 };
-type Screen="home"|"browse"|"editor";
+type Screen="browse"|"editor";
 
 const DOCS_KEY="biopilot-eln-docs-v1";
 const SEQ_KEY="biopilot-eln-seq-v1";
@@ -59,22 +59,11 @@ function safeLink(v:string){
 function Logo(){
   return <span className="logo" aria-hidden="true"><i/><b/><em/><strong/></span>;
 }
-function Header({home}:{home:()=>void}){
+function Header({editor}:{editor:()=>void}){
   return <header className="appHeader">
-    <button className="brand" type="button" onClick={home}><Logo/><span>BioPilot</span><small>ELN</small></button>
+    <button className="brand" type="button" onClick={editor}><Logo/><span>BioPilot</span><small>ELN</small></button>
     <div className="moduleBadge"><ScrollText size={15}/> Electronic Lab Notebook</div>
   </header>;
-}
-function Home({go}:{go:(s:Screen)=>void}){
-  return <main className="home">
-    <div className="eyebrow"><ScrollText size={17}/> Electronic Lab Notebook</div>
-    <h1>ELN</h1>
-    <p className="lead">Create, open and manage laboratory notes. Documents can be linked to a BioPilot experiment by experiment number.</p>
-    <section className="cards">
-      <button className="card primary" type="button" onClick={()=>go("editor")}><span><FilePlus2/></span><div><b>New</b><small>Create a new ELN document</small></div><ChevronRight/></button>
-      <button className="card" type="button" onClick={()=>go("browse")} aria-label="Browse ELN documents"><span><FolderOpen/></span><div><b>Browse</b><small>Open or delete existing ELN documents</small></div><ChevronRight/></button>
-    </section>
-  </main>;
 }
 function Browser({docs,back,open,remove}:{docs:Doc[];back:()=>void;open:(d:Doc)=>void;remove:(d:Doc)=>void}){
   const[q,setQ]=useState("");
@@ -125,12 +114,13 @@ function Toolbar(){
     <button title="Redo" onMouseDown={keep} onClick={()=>cmd("redo")}><Redo2 size={17}/></button>
   </div>;
 }
-function Editor({doc,onChange,onSave,onBack}:{doc:Doc;onChange:(d:Doc)=>void;onSave:(d:Doc)=>void;onBack:()=>void}){
+function Editor({doc,docs,onChange,onSave,onBrowse,onNew,onDelete,onOpen}:{doc:Doc;docs:Doc[];onChange:(d:Doc)=>void;onSave:(d:Doc)=>void;onBrowse:()=>void;onNew:()=>void;onDelete:(d:Doc)=>void;onOpen:(d:Doc)=>void}){
   const editor=useRef<HTMLDivElement>(null);
   const[dirty,setDirty]=useState(false);
   const[savedAt,setSavedAt]=useState(doc.updatedAt);
   const[editingTitle,setEditingTitle]=useState(false);
   const titleInput=useRef<HTMLInputElement>(null);
+  const recent=useMemo(()=>[...docs].sort((a,b)=>new Date(b.updatedAt).getTime()-new Date(a.updatedAt).getTime()).slice(0,5),[docs]);
 
   useEffect(()=>{if(editor.current&&editor.current.innerHTML!==doc.contentHtml)editor.current.innerHTML=doc.contentHtml},[doc.id]);
   useEffect(()=>{if(editingTitle){titleInput.current?.focus();titleInput.current?.select()}},[editingTitle]);
@@ -149,13 +139,29 @@ function Editor({doc,onChange,onSave,onBack}:{doc:Doc;onChange:(d:Doc)=>void;onS
     window.addEventListener("keydown",h);return()=>window.removeEventListener("keydown",h);
   },[doc,dirty]);
 
+  const startNew=()=>{if(dirty)save();onNew()};
+  const requestDelete=()=>{
+    if(dirty){
+      const d={...doc,contentHtml:editor.current?.innerHTML||doc.contentHtml,updatedAt:new Date().toISOString()};
+      onChange(d);onSave(d);setDirty(false);setSavedAt(d.updatedAt);onDelete(d);return;
+    }
+    onDelete(doc);
+  };
+
   return <main className="editor">
     <div className="editorTop">
-      <button className="back" type="button" onClick={()=>{if(dirty)save();onBack()}}><ArrowLeft size={18}/> Back</button>
       <div className="docId"><ScrollText size={17}/><b>{doc.elnNumber}</b></div>
       <span className={dirty?"status dirty":"status saved"}>{dirty?<><span/> Unsaved changes</>:<><Check size={15}/> Saved {new Intl.DateTimeFormat("en-GB",{hour:"2-digit",minute:"2-digit"}).format(new Date(savedAt))}</>}</span>
       <button className="save" type="button" onClick={save}><Save size={16}/> Save</button>
+      <button className="editorAction deleteCurrent" type="button" onClick={requestDelete}><Trash2 size={16}/> Delete</button>
+      <button className="editorAction newDoc" type="button" onClick={startNew}><FilePlus2 size={16}/> New</button>
     </div>
+    <section className="recentStrip">
+      <div className="recentHeader"><span>Recent ELNs</span><button type="button" onClick={onBrowse}><FolderOpen size={15}/> Browse</button></div>
+      <div className="recentList">
+        {recent.length?recent.map(d=><button key={d.id} type="button" className={d.id===doc.id?"recentItem active":"recentItem"} onClick={()=>onOpen(d)}><b>{d.elnNumber}</b><small>{d.title||d.elnNumber}</small></button>):<span className="recentEmpty">No saved ELNs yet</span>}
+      </div>
+    </section>
     <section className="meta">
       <label><span>Document name</span><input value={doc.title} onChange={e=>update({title:e.target.value})} onBlur={()=>{if(!doc.title.trim())update({title:doc.elnNumber})}} placeholder={doc.elnNumber}/></label>
       <label><span>Experiment no.</span><div className="iconInput"><Microscope size={16}/><input value={doc.experimentNumber} onChange={e=>update({experimentNumber:e.target.value})} placeholder="e.g. EXP-00124"/></div></label>
@@ -184,36 +190,34 @@ function Confirm({doc,cancel,confirm}:{doc:Doc;cancel:()=>void;confirm:()=>void}
   return <div className="overlay"><div className="modal"><button className="x" type="button" onClick={cancel}><X/></button><div className="warn"><Trash2/></div><h3>Delete {doc.elnNumber}?</h3><p>This permanently removes the ELN document from this browser. This action cannot be undone.</p><div className="modalActions"><button type="button" onClick={cancel}>Cancel</button><button type="button" className="confirm" onClick={confirm}><Trash2 size={16}/> Delete</button></div></div></div>;
 }
 export default function App(){
-  const[screen,setScreen]=useState<Screen>("home");
+  const[screen,setScreen]=useState<Screen>("editor");
   const[docs,setDocs]=useState<Doc[]>(()=>loadDocs());
-  const[current,setCurrent]=useState<Doc|null>(null);
+  const[current,setCurrent]=useState<Doc>(()=>makeDoc());
   const[pendingDelete,setPendingDelete]=useState<Doc|null>(null);
 
   useEffect(()=>persist(docs),[docs]);
+
   const save=(d:Doc)=>{
     commitNumber(d.year,d.sequence);
     setDocs(list=>list.some(x=>x.id===d.id)?list.map(x=>x.id===d.id?d:x):[d,...list]);
   };
-  const go=(s:Screen)=>{
-    if(s==="editor"){
+  const newDoc=()=>{setCurrent(makeDoc());setScreen("editor")};
+  const openDoc=(d:Doc)=>{setCurrent(d);setScreen("editor")};
+  const showEditor=()=>setScreen("editor");
+  const confirmDelete=()=>{
+    if(!pendingDelete)return;
+    const deletedId=pendingDelete.id;
+    setDocs(list=>list.filter(d=>d.id!==deletedId));
+    setPendingDelete(null);
+    if(current.id===deletedId){
       setCurrent(makeDoc());
       setScreen("editor");
-      return;
     }
-    if(s==="browse"){
-      setCurrent(null);
-      setScreen("browse");
-      return;
-    }
-    setScreen("home");
   };
-  const home=()=>setScreen("home");
-  const remove=()=>{if(!pendingDelete)return;setDocs(list=>list.filter(d=>d.id!==pendingDelete.id));setPendingDelete(null)};
 
-  return <div className="app"><Header home={home}/>
-    {screen==="home"&&<Home go={go}/>}
-    {screen==="browse"&&<Browser docs={docs} back={home} open={d=>{setCurrent(d);setScreen("editor")}} remove={setPendingDelete}/>}
-    {screen==="editor"&&current&&<Editor doc={current} onChange={setCurrent} onSave={save} onBack={home}/>}
-    {pendingDelete&&<Confirm doc={pendingDelete} cancel={()=>setPendingDelete(null)} confirm={remove}/>}
+  return <div className="app"><Header editor={showEditor}/>
+    {screen==="browse"&&<Browser docs={docs} back={showEditor} open={openDoc} remove={setPendingDelete}/>}
+    {screen==="editor"&&<Editor doc={current} docs={docs} onChange={setCurrent} onSave={save} onBrowse={()=>setScreen("browse")} onNew={newDoc} onDelete={setPendingDelete} onOpen={openDoc}/>}
+    {pendingDelete&&<Confirm doc={pendingDelete} cancel={()=>setPendingDelete(null)} confirm={confirmDelete}/>}
   </div>;
 }
