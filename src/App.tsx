@@ -160,7 +160,8 @@ function Editor({
   doc:Doc;docs:Doc[];mode:Mode;onChange:(d:Doc)=>void;onSave:(d:Doc,changeType?:string)=>Promise<Doc>;
   onBrowse:()=>void;onNew:()=>void;onDelete:(d:Doc)=>void;onOpen:(d:Doc)=>void;onHistory:(d:Doc)=>void;
   onFinalize:(d:Doc)=>Promise<void>;onSign:(d:Doc)=>Promise<void>;onUpload:(d:Doc,file:File)=>Promise<Attachment>;
-  onDeleteAttachment:(d:Doc,a:Attachment)=>Promise<void>;onSearchExperiments:(q:string)=>Promise<Array<{experimentNumber:string;title?:string}>>
+  onDeleteAttachment:(d:Doc,a:Attachment)=>Promise<void>;onSearchExperiments:(q:string)=>Promise<Array<{experimentNumber:string;title?:string}>>;
+  onBackup:()=>void;onRestore:(file:File)=>void
 }){
   const editor=useRef<HTMLDivElement>(null);
   const fileInput=useRef<HTMLInputElement>(null);
