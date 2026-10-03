@@ -9,8 +9,9 @@
     "preview": "vite preview",
     "start:api": "node server/index.js",
     "test": "vitest run",
-    "check": "npm run typecheck && npm run test && npm run build",
-    "typecheck": "tsc -p tsconfig.app.json --noEmit"
+    "check": "npm run typecheck && npm run test && npm run check:server && npm run build",
+    "typecheck": "tsc -p tsconfig.app.json --noEmit",
+    "check:server": "node --check server/index.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
