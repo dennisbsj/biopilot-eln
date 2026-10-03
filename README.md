@@ -1,6 +1,6 @@
 # BioPilot ELN
 
-Standalone browser-based Electronic Laboratory Notebook for BioPilot.
+Standalone browser-based Electronic Laboratory Notebook.
 
 ## Architecture
 
@@ -10,7 +10,9 @@ The ELN is now split into two JavaScript applications in the same repository:
 - **Backend:** Node.js + Express, deployed as the Render web service `biopilot-eln-api`.
 - **Database:** PostgreSQL on Render (`biopilot-eln-db`).
 
-The frontend talks to the API through `VITE_API_URL`. If the API/database is unavailable, the app deliberately falls back to browser storage so the editor remains usable.
+This repository and application are intentionally standalone. They do not share a backend, login, database, repository, or runtime dependency with the main BioPilot platform or Flow Studio.
+
+The frontend talks only to its own ELN API through `VITE_API_URL`. If the API/database is unavailable, the app deliberately falls back to browser storage so the editor remains usable.
 
 ## Implemented ELN features
 
@@ -27,7 +29,6 @@ The frontend talks to the API through `VITE_API_URL`. If the API/database is una
 - Soft delete / Trash / Restore / permanent delete
 - Attachments and inline image insertion
 - Print / Save as PDF
-- Experiment lookup adapter for the BioPilot backend
 - Automatic migration of existing browser-local ELNs when the server database becomes available
 
 ## Backend
@@ -45,8 +46,6 @@ Important environment variables:
 
 - `DATABASE_URL` — PostgreSQL connection string.
 - `FRONTEND_ORIGIN` — allowed browser origin.
-- `BIOPILOT_API_BASE_URL` — optional URL of the main BioPilot JavaScript/backend API.
-- `BIOPILOT_API_TOKEN` — optional bearer token for BioPilot experiment lookup.
 
 ## Frontend
 
