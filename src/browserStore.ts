@@ -239,13 +239,28 @@ export async function importBrowserBackup(text:string){
   try{parsed=JSON.parse(text)}catch{throw new Error("Backup file is not valid JSON")}
   if(parsed?.format!=="biopilot-eln-browser-backup"||parsed?.version!==1||!Array.isArray(parsed.documents))throw new Error("This is not a valid BioPilot ELN backup");
   const docs=parsed.documents.map(validateBackupDoc);
-  const documentIds=new Set<string>(docs.map((d:Doc)=>d.id));
+  const documentIds=new Set<string>();
+  for(const d of docs){
+    if(documentIds.has(d.id))throw new Error(`Backup contains duplicate document ID: ${d.id}`);
+    documentIds.add(d.id);
+  }
   const versions=Array.isArray(parsed.versions)?parsed.versions.map((v:unknown)=>validateBackupVersion(v,documentIds)):[];
+  const versionIds=new Set<string>();
+  for(const v of versions){
+    const key=String(v.id);
+    if(versionIds.has(key))throw new Error(`Backup contains duplicate version ID: ${key}`);
+    versionIds.add(key);
+  }
   const existing=await listBrowser();
+  const existingById=new Map(existing.map(d=>[d.id,d]));
   const numberOwners=new Map(existing.map(d=>[d.elnNumber,d.id]));
   for(const d of docs){
     const owner=numberOwners.get(d.elnNumber);
     if(owner&&owner!==d.id)throw new Error(`ELN number conflict: ${d.elnNumber}`);
+    const current=existingById.get(d.id);
+    if(current&&current.status!=="draft"&&immutableFingerprint(current)!==immutableFingerprint(d)){
+      throw new Error(`Restore cannot modify immutable ELN: ${current.elnNumber}`);
+    }
     numberOwners.set(d.elnNumber,d.id);
   }
   const db=await openDb();const tx=db.transaction([DOCS,VERSIONS,META],"readwrite");
