@@ -261,6 +261,43 @@ app.delete("/api/documents/:docId/attachments/:attachmentId",requireDb,async(req
 app.get("/api/experiments",requireDb,async(req,res,next)=>{
   try{
     const q=String(req.query.q||"").trim();
+
+    // Optional external API bridge. ELN stays standalone and only talks to
+    // whatever endpoint is explicitly configured through environment variables.
+    const externalBase=(process.env.EXTERNAL_API_BASE_URL||"").replace(/\/$/,"");
+    const experimentsPath=process.env.EXTERNAL_EXPERIMENTS_PATH||"/experiments";
+    const queryParam=process.env.EXTERNAL_EXPERIMENTS_QUERY_PARAM||"search";
+
+    if(externalBase&&q){
+      try{
+        const headers={Accept:"application/json"};
+        if(process.env.EXTERNAL_API_TOKEN){
+          headers.Authorization=`Bearer ${process.env.EXTERNAL_API_TOKEN}`;
+        }
+        const separator=experimentsPath.includes("?")?"&":"?";
+        const url=`${externalBase}${experimentsPath}${separator}${encodeURIComponent(queryParam)}=${encodeURIComponent(q)}`;
+        const r=await fetch(url,{headers});
+        if(r.ok){
+          const body=await r.json();
+          const items=Array.isArray(body)?body:(body.results||body.items||body.data||[]);
+          const mapped=items.slice(0,20).map(x=>({
+            experimentNumber:String(
+              x.experimentNumber ??
+              x.experiment_number ??
+              x.number ??
+              x.code ??
+              x.id ??
+              ""
+            ),
+            title:String(x.title ?? x.name ?? "")
+          })).filter(x=>x.experimentNumber);
+          if(mapped.length)return res.json(mapped);
+        }
+      }catch(err){
+        console.warn("External experiment lookup failed; falling back to ELN data",err?.message||err);
+      }
+    }
+
     const {rows}=await pool.query(`SELECT experiment_number,MAX(title) AS title FROM eln_documents WHERE experiment_number<>'' AND experiment_number ILIKE $1 GROUP BY experiment_number ORDER BY experiment_number LIMIT 20`,[`%${q}%`]);
     res.json(rows.map(r=>({experimentNumber:r.experiment_number,title:r.title})));
   }catch(e){next(e)}
